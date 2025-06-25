@@ -1,5 +1,4 @@
 import { connect } from "mongoose";
-import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const connectToDB = async () => {
   try {
