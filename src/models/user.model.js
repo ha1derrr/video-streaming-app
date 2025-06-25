@@ -8,15 +8,30 @@ const userSchema = new Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
     email: {
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    fullName: {
+      type: String,
+      required: true,
+    },
+    avatar: {
+      type: String, // Cloudinary URL
+      required: true,
+    },
+    coverImage: {
+      type: String, // Cloudinary URL
     },
     password: {
       type: String,
-      required: true,
+      required: [true, "Password Required"],
       unique: true,
     },
     watchHistory: [
@@ -25,6 +40,9 @@ const userSchema = new Schema(
         ref: "Video",
       },
     ],
+    refreshToken: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
@@ -64,4 +82,4 @@ userSchema.methods.generateRefreshToken = function () {
   );
 };
 
-export const User = model("User", userSchema);
+export const { User } = model("User", userSchema);

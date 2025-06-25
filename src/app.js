@@ -2,6 +2,8 @@ import express from "express";
 const app = express();
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import { userRouter } from "./routes/user.route.js";
+import { staticRouter } from "./routes/static.route.js";
 
 app.use(cookieParser());
 app.use(express.static("public"));
@@ -17,16 +19,7 @@ app.use(
   })
 );
 
-app.get("/", (req, res) =>
-  res.json({
-    result: [
-      {
-        name: "Haider",
-        course: "MCA",
-        profession: "Web Dev",
-      },
-    ],
-  })
-);
+app.use("/users", userRouter);
+app.use("/", staticRouter);
 
 export { app };
