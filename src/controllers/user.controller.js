@@ -1,6 +1,7 @@
 // import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshToken = async (userId) => {
   const user = await User.findById(userId);
@@ -89,8 +90,8 @@ const registerUser = async (req, res, next) => {
 const loginUser = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
-    if (!username || !email) {
-      throw new Error("username or email is missing");
+    if (!username && !email) {
+      throw new Error("username or email is required");
     }
     const user = await User.findOne({
       $or: [{ username }, { email }],
@@ -146,4 +147,36 @@ const logoutUser = async (req, res, next) => {
   }
 };
 
-export { registerUser, loginUser, logoutUser };
+const refreshAccessToken = async (req, res, next) => {
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
+  if (!incomingRefreshToken) throw new Error("No refresh token found");
+  const decodedToken = jwt.verify(
+    incomingRefreshToken,
+    process.env.REFRESH_TOKEN_SECRET
+  );
+  const user = await User.findById(decodedToken?._id);
+  // Might be the frontend sent a fake token and user doesn't exists on our database
+  if (!user) throw new Error("Invalid refresh token");
+
+  if (incomingRefreshToken !== user?.refreshToken)
+    throw new Error("Refresh Token Expired or used");
+  // For the above case we will redirect the user to login again
+
+  const { accessToken, newRefreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(201)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", newRefreshToken, options)
+    .send("New Access Token and Generated");
+};
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
