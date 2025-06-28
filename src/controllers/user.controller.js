@@ -361,11 +361,11 @@ const getUserWatchHistory = async (req, res, next) => {
           ],
         },
       },
-      {
-        $addFields: {
-          watchHistory: { $first: "$watchHistory" },
-        },
-      },
+      // {
+      //   $addFields: {
+      //     watchHistory: { $first: "$watchHistory" },
+      //   },
+      // },
       {
         $project: {
           fullName: 1,
@@ -378,10 +378,10 @@ const getUserWatchHistory = async (req, res, next) => {
       },
     ]);
 
-    if (!user?.length) throw new Error("No watch history");
+    // if (!user?.length) throw new Error("No watch history");
 
     return res.status(200).json({
-      user: user[0],
+      "Watch History": user[0].watchHistory,
       message: "Fetched User History",
     });
   } catch (error) {
