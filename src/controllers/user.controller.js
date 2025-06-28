@@ -1,4 +1,5 @@
 // import { asyncHandler } from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
@@ -81,7 +82,11 @@ const registerUser = async (req, res, next) => {
     );
     if (!createdUser)
       throw new Error("Something went wrong while creating user");
-    res.status(201).json({ "User created successfully": createdUser });
+    res.status(201).json({
+      user: createdUser,
+      status: 201,
+      message: "User registered successfully",
+    });
   } catch (error) {
     next(error);
   }
@@ -91,7 +96,7 @@ const loginUser = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
     if (!username && !email) {
-      throw new Error("username or email is required");
+      throw new Error("Email or username is required");
     }
     const user = await User.findOne({
       $or: [{ username }, { email }],
@@ -120,7 +125,12 @@ const loginUser = async (req, res, next) => {
       .status(200)
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
-      .json({ user: loggedInUser, refreshToken, accessToken });
+      .json({
+        user: loggedInUser,
+        refreshToken,
+        accessToken,
+        message: "User logged in",
+      });
   } catch (error) {
     next(error);
   }
@@ -131,8 +141,9 @@ const logoutUser = async (req, res, next) => {
     await User.findByIdAndUpdate(
       req.user._id,
       {
-        $set: {
-          refreshToken: undefined,
+        $unset: {
+          // Removes the field from the document using the flag 1
+          refreshToken: 1,
         },
       }
       // new:true returns the updated document or entry
@@ -181,7 +192,11 @@ const refreshAccessToken = async (req, res, next) => {
     .status(201)
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", newRefreshToken, options)
-    .send("New Access Token and Refresh Token Generated");
+    .json({
+      message: "New Access Token and Refresh Token Generated",
+      accessToken,
+      newRefreshToken,
+    });
 };
 
 const changeUserPassword = async (req, res, next) => {
@@ -203,7 +218,7 @@ const changeUserPassword = async (req, res, next) => {
 
 const getCurrentUser = async (req, res, next) => {
   try {
-    return res.send(req.user);
+    return res.json(req.user);
   } catch (error) {
     next(error);
   }
@@ -212,18 +227,19 @@ const getCurrentUser = async (req, res, next) => {
 const updateUserDetails = async (req, res, next) => {
   const { fullName, email } = req.body;
   if (!fullName || !email) throw new Error("One of the field is missing");
-  await User.findByIdAndUpdate(
+  const updatedUser = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
         fullName,
         email,
       },
-    }
+    },
     // The {new:true} returns the updated user
-    // { new: true }
+    { new: true }
   ).select("-password -refreshToken");
-  return res.send("Email and Fullname updated successfully");
+
+  return res.json({ "Updated User": updatedUser });
 };
 
 const updateAvatar = async (req, res, next) => {
@@ -232,12 +248,18 @@ const updateAvatar = async (req, res, next) => {
     if (!localFilePath) throw new Error("User didn't upload avatar");
     const avatar = await uploadOnCloudinary(localFilePath);
     if (!avatar) throw new Error("Cloudinary didn't respond");
-    await User.findByIdAndUpdate(req.user?._id, {
-      $set: {
-        avatar: avatar.url,
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          avatar: avatar.url,
+        },
       },
-    });
-    return res.send("Avatar updated successfully");
+      {
+        new: true,
+      }
+    ).select("-password -refreshToken");
+    return res.json({ updatedUser, message: "Avatar Updated Successfully" });
   } catch (error) {
     next(error);
   }
@@ -270,9 +292,11 @@ const getUserChannelProfile = async (req, res, next) => {
       {
         $addFields: {
           subscribersCount: {
+            // $ with subscribers because now it is a field
             $size: "$subscribers",
           },
           channelsSubscribedToCount: {
+            // $ with subscribedTo because now it is a field
             $size: "$subscribedTo",
           },
           isSubscribed: {
@@ -296,7 +320,70 @@ const getUserChannelProfile = async (req, res, next) => {
       },
     ]);
     if (!channel) throw new Error("Channel doesn't exist");
-    return res.json({ "The Channel Object": channel[0] });
+    return res.json({ channel: channel[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getUserWatchHistory = async (req, res, next) => {
+  try {
+    const user = await User.aggregate([
+      {
+        $match: { _id: new mongoose.Types.ObjectId(req.user?._id) },
+      },
+      {
+        $lookup: {
+          from: "videos",
+          localField: "watchHistory",
+          foreignField: "_id",
+          as: "watchHistory",
+          pipeline: [
+            {
+              $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+              },
+            },
+            {
+              $project: {
+                username: 1,
+                fullName: 1,
+              },
+            },
+            {
+              $addFields: {
+                owner: { $first: "$owner" },
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          watchHistory: { $first: "$watchHistory" },
+        },
+      },
+      {
+        $project: {
+          fullName: 1,
+          email: 1,
+          username: 1,
+          description: 1,
+          thumbnail: 1,
+          watchHistory: 1,
+        },
+      },
+    ]);
+
+    if (!user?.length) throw new Error("No watch history");
+
+    return res.status(200).json({
+      user: user[0],
+      message: "Fetched User History",
+    });
   } catch (error) {
     next(error);
   }
@@ -312,4 +399,5 @@ export {
   updateUserDetails,
   updateAvatar,
   getUserChannelProfile,
+  getUserWatchHistory,
 };
