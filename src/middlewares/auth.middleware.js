@@ -6,7 +6,7 @@ export const jwtVerify = async (req, res, next) => {
     const accessToken =
       req.cookies?.accessToken ||
       req.header("Authorization").replace("Bearer ", "");
-    // req.cookies?.accessToken || req.header("Authorization").split(" ")[0];
+    // req.cookies?.accessToken || req.header("Authorization").split(" ")[1];
 
     if (!accessToken) throw new Error("Unauthorized Request");
     const decodedInfo = jwt.verify(

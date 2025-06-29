@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import { userRouter } from "./routes/user.route.js";
 import { staticRouter } from "./routes/static.route.js";
+import { videoRouter } from "./routes/video.route.js";
 
 app.use(cookieParser());
 app.use(express.static("public"));
@@ -21,5 +22,6 @@ app.use(
 
 app.use("/users", userRouter);
 app.use("/", staticRouter);
+app.use("/videos", videoRouter);
 
 export { app };

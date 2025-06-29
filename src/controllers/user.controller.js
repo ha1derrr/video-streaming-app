@@ -366,16 +366,6 @@ const getUserWatchHistory = async (req, res, next) => {
       //     watchHistory: { $first: "$watchHistory" },
       //   },
       // },
-      {
-        $project: {
-          fullName: 1,
-          email: 1,
-          username: 1,
-          description: 1,
-          thumbnail: 1,
-          watchHistory: 1,
-        },
-      },
     ]);
 
     // if (!user?.length) throw new Error("No watch history");
