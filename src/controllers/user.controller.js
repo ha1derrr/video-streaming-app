@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const generateAccessAndRefreshToken = async (userId) => {
   const user = await User.findById(userId);
@@ -326,58 +327,66 @@ const getUserChannelProfile = async (req, res, next) => {
   }
 };
 
-const getUserWatchHistory = async (req, res, next) => {
-  try {
-    const user = await User.aggregate([
-      {
-        $match: { _id: new mongoose.Types.ObjectId(req.user?._id) },
+const getUserWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: { _id: new mongoose.Types.ObjectId(req.user?._id) },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    fullName: 1,
+                  },
+                },
+              ],
+            },
+          },
+          // {
+          //   $addFields: { $first: "$owner" },
+          // },
+          {
+            $unwind: "$owner",
+          },
+          {
+            $project: {
+              title: 1,
+              videoFile: 1,
+              duration: 1,
+              owner: 1,
+            },
+          },
+        ],
       },
-      {
-        $lookup: {
-          from: "videos",
-          localField: "watchHistory",
-          foreignField: "_id",
-          as: "watchHistory",
-          pipeline: [
-            {
-              $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "owner",
-              },
-            },
-            {
-              $project: {
-                username: 1,
-                fullName: 1,
-              },
-            },
-            {
-              $addFields: {
-                owner: { $first: "$owner" },
-              },
-            },
-          ],
-        },
+    },
+    {
+      $project: {
+        username: 1,
+        fullName: 1,
+        avatar: 1,
+        watchHistory: 1,
       },
-      // {
-      //   $addFields: {
-      //     watchHistory: { $first: "$watchHistory" },
-      //   },
-      // },
-    ]);
-
-    // if (!user?.length) throw new Error("No watch history");
-
-    return res.status(200).json({
-      "Watch History": user[0].watchHistory,
-      message: "Fetched User History",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    },
+    {
+      $unwind: "$user",
+    },
+  ]);
+  if (!user[0]?.watchHistory?.length) throw new Error("No watch History");
+  return res.status(201).json(user.watchHistory);
+});
 
 export {
   registerUser,
